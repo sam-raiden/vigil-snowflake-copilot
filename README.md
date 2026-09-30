@@ -13,6 +13,7 @@ All data is synthetic. Built for the Snowflake CoCo CLI Hackathon (GCC Edition),
 | 6 policy documents, 35 numbered clauses (`policies/`, table `POLICY_CLAUSES`) | Built |
 | Streamlit app in Snowflake: chat, audit panel, 6 clickable questions, ring graph, download | Built, deployed, tested (`coco_lifecycle_log/testing/test_results.md`) |
 | Clarify-if-ambiguous, no-answer-without-citation, low-confidence fallback | Built, tested |
+| Semantic view `VIGIL_SV` (`sql/07_semantic_view.sql`), 6 tables, facts, dimensions, metrics | Built. Queries 1, 2, 3, 5, 6 checked through `SEMANTIC_VIEW()` (10 expected rows). Not validated through Cortex Analyst natural language, and the ring question (4) is not in it |
 | Slack | Draft-only. Nothing is ever posted. Real Slack via MCP is not built |
 | CoCo / Cortex Search / Cortex Analyst / Cortex Agents | **Not built, not used.** See below |
 
