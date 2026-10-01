@@ -29,3 +29,7 @@ Scenario 2 timing; concurrency; any data volume beyond 638 rows; the app from a 
 
 ## Semantic view check (sql/07_semantic_view.sql)
 `CREATE SEMANTIC VIEW VIGIL_SV` succeeded (DDL is allowed on the trial). Two attempts failed first: metrics must aggregate over declared facts, and a metric name may not equal a physical column name. Deterministic queries via `SEMANTIC_VIEW()` returned 10 rows: q1 TXN-ST-01..04, q2 TXN-HR-01, q3 TXN-VE-01..03, q5 2026-09-17 (94.00), q6 LN-0025 (provision 15% of outstanding). This checks the model's definitions, not Cortex Analyst's natural-language handling, which is unavailable. Question 4 (ring) is answered by RINGS, which is not in the view.
+
+## Re-check, 2026-10-01
+- `SNOWFLAKE.CORTEX.COMPLETE` re-tested: still "AI function COMPLETE is not available for trial accounts" (sql/08_cortex_check.sql). The blocked items remain blocked.
+- Live-app retests of the off-topic fallback, the post-fix context behaviour and scenario 2 timing were attempted but the browser session stopped accepting input to the app (page froze on load, typed text ignored), so they are still UNTESTED in the live app.
