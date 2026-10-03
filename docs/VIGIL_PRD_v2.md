@@ -1,58 +1,99 @@
-# VIGIL: updated PRD (v2, 3 Oct 2026)
+# VIGIL: Product Requirements (v2)
 
-Replaces the original build PRD (`VIGIL_BUILD_PRD.md`) with what is true now. Scope is unchanged: a cited risk, fraud and regulatory copilot over synthetic data, covering fraud/AML (with graph-based ring detection), liquidity (LCR) and credit (NPA). No new features.
+A cited risk, fraud and regulatory copilot for banking and NBFC compliance teams. A user asks a plain-English question and gets an audit-ready finding: a verdict, the evidence records, and the exact policy clause behind it. All data is synthetic.
 
-## 1. What changed since v1
-| Item | v1 assumption | Reality |
-|------|---------------|---------|
-| Snowflake account | Hackathon signup gives CoCo and Cortex | Plain trial accounts (`ba61812`, a CoCo-developer signup) have Cortex and CoCo disabled. Only the **hackathon credit-link** account (`ua33749`) had them, and it was locked because of a non-corporate email |
-| CoCo | Builds everything, logged at every phase | Used for planning (2 prompts) and the start of the data build on `ua33749`. The rest was built by hand on the old account |
-| Who builds | One person, fully automated | An AI assistant cannot work inside a teammate's logged-in account (safety guard). The build in the teammate's account is done by pasting prompts from the runbook |
-| Slack | One MCP connector, request-only | Draft-only until a webhook/external-access integration exists |
+## 1. Problem
+Compliance teams receive an alert, then assemble the evidence and the matching policy clause by hand. Fraud rings are harder still: each account looks ordinary on its own, so per-transaction rules never fire.
 
-## 2. Current state
-**Done (built and tested on the old account, code in the public repo `github.com/sam-raiden/vigil-snowflake-copilot`)**
-- Schema, synthetic data, ring detection (`RING_EDGES`, `RINGS` Dynamic Tables with hub filter), 35 policy clauses, semantic view `VIGIL_SV`, rule-based Streamlit app, tests and logs.
-- CoCo planning logs (ontology and workflow) from `ua33749`, plus a partial CoCo data build (database, 6 tables, customers, accounts, about 600 transactions).
+## 2. Goals
+- Answer fraud/AML, liquidity and credit questions in natural language, with evidence.
+- Find fraud rings that no single transaction reveals, using a relationship graph.
+- Never answer without a citation: a record ID and a policy document plus clause.
+- Say so plainly when confidence is low, and ask when the question does not name a transaction, account or loan.
+- Stay a copilot: a human signs off on every filing, and nothing acts unasked.
 
-**Not done**
-- Anything that needs Cortex: Cortex Search service, Cortex Analyst validation, Cortex Agent, CoCo-generated build in a working account.
-- Real Slack posting. Demo video. Official MVP brief submission. Final deck review.
+## 3. Users and flow
+A compliance analyst asks a question. The copilot gathers the signal and evidence, quotes the policy clause, and produces a downloadable finding.
 
-## 3. Plan to finish (in priority order)
-Account: the teammate's hackathon-link account (`rf23286`). Work is done by the owner/you pasting, one step at a time (`docs/RUNBOOK_PASTE_INTO_COCO.md`).
+Signal → Evidence → Documented finding.
 
-1. **Confirm Cortex** (1 min): `SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3.1-8b','Reply OK');` must return OK.
-2. **Data via CoCo** (`coco_lifecycle_log/development/prompt_A.txt`), then verify counts and the seeded patterns.
-3. **Ring tables via CoCo** (or `sql/01_schema_and_data.sql` as a fallback), then confirm ACC-0031..0035 form one ring and the electricity-board utility does not.
-4. **Policies and Cortex Search**: run `sql/03_policy_clauses.sql`, then `sql/04_search_service.sql` or the CoCo prompt.
-5. **Semantic view**: `sql/07_semantic_view.sql` or the CoCo prompt; validate the six questions.
-6. **Agent** (one agent: Analyst + Search + ring lookup) with the citation, clarify and no-auto-Slack instructions.
-7. **App**: CoCo-built Streamlit calling the agent, or fall back to `app/streamlit_app.py` + `sql/05`, `sql/06`.
-8. **Tests**: six scenarios, an ambiguous question, the utility account (no ring), Slack only on request; time three questions with a stopwatch.
-9. **Submit** before **4 Oct 2026, 11:59 PM IST**: repo link, deployed app note (needs Snowflake login), MVP brief, deck; demo video if possible.
+## 4. Scope
+**In scope**
+- Fraud/AML: structuring, high-risk-jurisdiction remittances, velocity, and ring detection (the novel piece).
+- Liquidity: LCR calculation and breach history, with the Basel III clause.
+- Credit: NPA classification and provisioning, with the RBI IRAC clause.
+- One agent (analytics + policy search + ring lookup), one chat and audit-panel app, six clickable example questions.
 
-## 4. Fallback if the Cortex account is not usable in time
-Submit the existing build: working app on the old account, public repo, CoCo planning logs and the partial CoCo data-build log, and the honest write-up (`README.md`, `docs/MVP_BRIEF.md`). It is complete but scores lower on CoCo usage.
+**Out of scope**
+- A second agent or a second external connector.
+- Anything scheduled that acts without being asked.
+- Real production data.
+- Graph detection for liquidity or credit (calculation and citation only).
+- A live external regulatory feed.
+- Any invented accuracy or efficiency percentage. Any number shown is measured, with its method stated.
 
-## 5. Frozen scope (unchanged)
-One agent only. No second connector. Nothing scheduled that acts unasked. No production data. No graph detection for liquidity or credit. No invented accuracy or efficiency percentages: any number in the app, brief or video is a measured, single-run figure with its method stated.
+## 5. Data model
+Eight entities in one schema.
+- CUSTOMERS(CUSTOMER_ID, FULL_NAME, RISK_SEGMENT, KYC_STATUS, ONBOARDED_DATE, COUNTRY)
+- ACCOUNTS(ACCOUNT_ID, CUSTOMER_ID, ACCOUNT_TYPE, OPENED_DATE, STATUS)
+- TRANSACTIONS(TRANSACTION_ID, ACCOUNT_ID, TRANSACTION_DATE, AMOUNT, CURRENCY, TRANSACTION_TYPE, COUNTERPARTY_NAME, COUNTERPARTY_COUNTRY, CHANNEL, IS_FLAGGED, FLAG_REASON)
+- ALERTS(ALERT_ID, TRANSACTION_ID, ALERT_TYPE, SEVERITY, CREATED_AT, STATUS)
+- LIQUIDITY_SNAPSHOTS(SNAPSHOT_DATE, HQLA_AMOUNT, NET_CASH_OUTFLOWS_30D, LCR_RATIO, STATUS)
+- CREDIT_PROFILES(LOAN_ACCOUNT_ID, CUSTOMER_ID, OUTSTANDING_AMOUNT, DAYS_PAST_DUE, CREDIT_SCORE, NPA_FLAG, AS_OF_DATE)
+- RING_EDGES(ACCOUNT_A, ACCOUNT_B, SHARED_ATTRIBUTE, SHARED_VALUE, LINK_STRENGTH): a Dynamic Table
+- RINGS(RING_ID, MEMBER_ACCOUNTS, SHARED_LINK, TRANSACTION_IDS, DETECTED_AT): a Dynamic Table
 
-## 6. Data model and seeded patterns (unchanged)
-8 entities: CUSTOMERS, ACCOUNTS, TRANSACTIONS, ALERTS, LIQUIDITY_SNAPSHOTS, CREDIT_PROFILES, RING_EDGES, RINGS. Seeded: structuring (ACC-0007, 4 deposits INR 1.85 to 1.95 lakh in 10 days), high-risk remittance (ACC-0012 to Myanmar, INR 6.5 lakh), velocity (ACC-0019, 86.7% out in under 24 h), ring (ACC-0031..0035 via one counterparty within 72 h, no individual flags), noise control (25 accounts paying one utility), LCR breach (2026-09-17, 94%), NPA (LN-0025, 120 days; LN-0033 at 88 days as a near miss).
+Relationships: CUSTOMERS 1-N ACCOUNTS 1-N TRANSACTIONS 1-N ALERTS; CREDIT_PROFILES N-1 CUSTOMERS; LIQUIDITY_SNAPSHOTS stands alone; RINGS reference TRANSACTIONS through TRANSACTION_IDS.
 
-## 7. Acceptance checklist (updated)
-- [x] 8 tables, consistent synthetic data (old account); CoCo partial build on `ua33749`
-- [x] Ring pattern and noise-control counterparty present; graph flags the ring and excludes the utility
-- [x] 6 policy documents, 35 clauses (table)
-- [ ] Policies indexed in Cortex Search (needs Cortex account)
-- [~] Semantic view built; 5 of 6 queries checked via `SEMANTIC_VIEW()`; Analyst NL validation pending
-- [ ] Cortex Agent with citation and clarify rules (rule-based equivalent in the app)
-- [ ] Slack on explicit request (draft-only now)
-- [~] Streamlit app deployed (old account, login required); agent-driven version pending
-- [~] Six scenarios tested on the rule-based app; agent version pending
-- [~] CoCo lifecycle logs: planning done, development partial, execution/testing pending in a Cortex account
-- [x] Public GitHub repo
-- [ ] MVP brief submitted, demo video, presentation uploaded
+### Seeded patterns (synthetic)
+| Pattern | Seed |
+|---|---|
+| Structuring | ACC-0007: 4 branch cash deposits of INR 1.85 to 1.95 lakh within 10 days |
+| High-risk country | ACC-0012: INR 6.5 lakh remittance to Myanmar |
+| Velocity | ACC-0019: INR 7.5 lakh deposit, 86.7% out in under 24 hours |
+| Ring | ACC-0031 to ACC-0035 each pay one counterparty within 72 hours; none individually flagged |
+| Noise control | 25 other accounts pay one electricity board in the same window; must not form a ring |
+| Liquidity | 30 daily LCR snapshots; 2026-09-17 breaches at 94% |
+| Credit | about 40 loans; LN-0025 at 120 days past due (NPA); LN-0033 at 88 days (near miss) |
 
-Legend: [x] done, [~] partly, [ ] not done.
+## 6. Policy documents (numbered clauses, indexed for retrieval)
+POL-AML-001 Structuring (includes Clause 4.5, the RING_PATTERN rule); POL-AML-002 High-risk jurisdictions; POL-AML-003 Velocity; POL-AML-004 STR filing and KYC; POL-LIQ-001 Basel III LCR; POL-CR-001 NPA and provisioning. 35 clauses in total, in `policies/`.
+
+## 7. Ring detection
+A Dynamic Table self-joins transactions to find pairs of different accounts that paid the same counterparty within 72 hours. A hub filter removes counterparties paid by more than 8 distinct accounts (legitimate shared relationships such as utilities). A second Dynamic Table groups the remaining edges into connected components and keeps groups of 3 or more accounts. Per POL-AML-001 Clause 4.5, a ring is presumptively coordinated activity needing escalation.
+
+## 8. Semantic layer and agent
+- Semantic view over the tables with the six verified questions: why was a transaction flagged for structuring; was the high-risk remittance compliant; the velocity pattern on an account; is this account connected to anything else; are we LCR compliant; which loans are NPA and what provisioning is required.
+- One agent with three tools: analytics over the semantic view, policy search over the clauses, and a ring lookup for an account.
+- Agent instructions: cite a record ID and a policy clause for every claim; state uncertainty instead of guessing; ask which transaction, account or loan when it is not specified; always check the ring lookup for fraud/AML questions; never post externally unless the user explicitly asks in the conversation.
+
+## 9. App
+A chat box on one side and an audit-ready panel on the other. The panel shows the verdict, evidence rows, record IDs, policy citations with clause text, a confidence note, and a download button for the finding. Six example questions are clickable. Ring questions also draw the account graph.
+
+## 10. Build plan
+1. Plan: ontology, metrics and workflow.
+2. Data: tables and synthetic data with the seeded patterns; verify counts and referential integrity.
+3. Graph: RING_EDGES and RINGS; tune the hub threshold so the seeded ring is found and the utility is excluded.
+4. Policies: load the 35 clauses; build the search service over them.
+5. Semantic view: build and validate against the six questions.
+6. Agent: configure the tools and instructions above.
+7. App: build and deploy.
+8. Test: six scenarios, an ambiguous question, the utility account, and an explicit-request-only external post; time three questions with a stopwatch and record the method.
+9. Package: README, MVP brief, demo script, deck.
+
+## 11. Acceptance checklist
+- [ ] 8 tables with consistent synthetic data, seeded patterns and noise control
+- [ ] Graph flags the seeded ring and excludes the utility
+- [ ] 6 policies, 35 numbered clauses, indexed for search
+- [ ] Semantic view validated against the six questions
+- [ ] Agent with citation, clarify-if-ambiguous and no-unasked-post rules
+- [ ] App deployed with chat, audit panel, six example questions, ring graph and download
+- [ ] Six scenarios tested; each answer cites a record ID and a policy clause
+- [ ] Ambiguous question gets a clarifying question
+- [ ] Utility counterparty is not reported as a ring
+- [ ] External post only on explicit request
+- [ ] Measured timings recorded with method
+- [ ] README, MVP brief, demo script and deck complete
+
+## 12. Honest limits to state in the brief
+Tested on a small synthetic dataset (hundreds of transactions); the hub threshold is tuned on one seeded case; entities are matched by exact name only; no device attribute (counterparty and a 72-hour window only); no live regulatory feed; the app runs inside Snowflake and needs a login; a human signs off on every filing.
